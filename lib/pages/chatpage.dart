@@ -39,22 +39,82 @@ class _ChatPageState extends State<ChatPage> {
   @override
   void initState() {
     super.initState();
-    _markMessagesAsReadOnInit(
-        widget.userId); // Mark messages as read when accessing the chat
+    _markMessagesAsReadOnInit(widget.userId);
+    _setUserActive(true); // Marquez l'utilisateur comme actif
+    _setIsSeen(true);
+
+    // Remarque : Vous devez également vous assurer de marquer l'utilisateur comme inactif lorsque vous quittez la discussion.
   }
 
-  // Send a message
+  @override
+  void dispose() {
+    _setIsSeen(false); // Marquez l'utilisateur comme inactif
+    super.dispose();
+  }
+
+  void _setUserActive(bool isActive) async {
+    await _firestore.collection('users').doc(currentUserId).update({
+      'isActive': isActive,
+    });
+  }
+
+  void _setIsSeen(bool isSeen) async {
+    await _firestore.collection('users').doc(currentUserId).update({
+      'isSeen': isSeen,
+    });
+  }
+
   void _sendMessage() async {
     if (_controller.text.isNotEmpty) {
-      await _firestore.collection('messages').add({
+      // Récupérer le statut isSeen et isActive du destinataire avant d'envoyer le message
+      DocumentSnapshot userDoc =
+          await _firestore.collection('users').doc(widget.userId).get();
+      bool isSeen = userDoc.exists &&
+          (userDoc.data() as Map<String, dynamic>)['isSeen'] == true;
+      bool isActive = userDoc.exists &&
+          (userDoc.data() as Map<String, dynamic>)['isActive'] == true;
+
+      // Préparer les données du message
+      Map<String, dynamic> messageData = {
         'text': _controller.text,
         'createdAt': FieldValue.serverTimestamp(),
         'senderId': currentUserId,
         'receiverId': widget.userId,
-        'isRead': false, // By default, the message is marked as unread
-        'delivered': false, // By default, the message is marked as undelivered
+        'isRead': false, // Par défaut : le message est marqué comme non lu
+        'delivered': false, // Par défaut : non livré initialement
+      };
+
+      // Ajouter le message à Firestore
+      DocumentReference messageRef =
+          await _firestore.collection('messages').add(messageData);
+
+      // Marquer le statut de l'utilisateur comme inactif
+      await _firestore.collection('users').doc(currentUserId).update({
+        'isActive': false, // Définir l'utilisateur comme inactif
       });
 
+      // Mettre à jour le statut du message en fonction de isSeen
+      if (isSeen) {
+        // Si le destinataire a vu les messages, marquez le message comme lu
+        await messageRef.update({
+          'isRead': true, // Deux coches bleues
+          'delivered': true, // Marquer comme livré
+        });
+      } else if (!isSeen && !isActive) {
+        // Si le destinataire n'a pas vu les messages et n'est pas actif
+        await messageRef.update({
+          'isRead': false, // Reste non lu (une coche grise)
+          'delivered': false, // Message est livré
+        });
+      } else if (!isSeen && isActive) {
+        // Si le destinataire n'a pas vu les messages mais est actif
+        await messageRef.update({
+          'isRead': false, // Reste non lu (une coche grise)
+          'delivered': true, // Message est livré
+        });
+      }
+
+      // Effacer le contrôleur de texte
       _controller.clear();
     }
   }
@@ -110,12 +170,6 @@ class _ChatPageState extends State<ChatPage> {
             const SizedBox(width: 8),
             Text(widget.userName),
             const Spacer(),
-            IconButton(
-              icon: const Icon(Icons.logout),
-              onPressed: () {
-                // Handle logout
-              },
-            ),
           ],
         ),
       ),

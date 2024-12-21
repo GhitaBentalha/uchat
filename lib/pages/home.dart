@@ -38,6 +38,14 @@ class UserAvatar extends StatelessWidget {
   }
 }
 
+class Message {
+  final String text;
+  final bool isNew;
+  final bool delivered;
+
+  Message({required this.text, required this.isNew, required this.delivered});
+}
+
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
@@ -84,7 +92,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _startTimer() {
-    _timer = Timer.periodic(Duration(seconds: 10), (Timer timer) {
+    _timer = Timer.periodic(Duration(seconds: 1), (Timer timer) {
       _fetchChatHistory();
     });
   }
@@ -398,12 +406,10 @@ class _HomePageState extends State<HomePage> {
               leading: Icon(Icons.logout),
               title: Text('Logout'),
               onTap: () async {
+                await _updateDeliveredStatusOnLogout(); // Mettez à jour le champ isActive
                 await FirebaseAuth.instance.signOut();
-                // Optionally reset any state variables here
-                // Redirect or update the UI as necessary
                 Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(
-                      builder: (context) => SignIn()), // Your login page widget
+                  MaterialPageRoute(builder: (context) => SignIn()),
                   (Route<dynamic> route) => false,
                 );
               },
@@ -412,6 +418,75 @@ class _HomePageState extends State<HomePage> {
         ),
       ),
     );
+  }
+
+  DateTime? _logoutTime;
+  Future<void> _sendMessage(String message, String receiverId) async {
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+    final timestamp = Timestamp.now();
+
+    await FirebaseFirestore.instance.collection('messages').add({
+      'text': message,
+      'senderId': currentUserId,
+      'receiverId': receiverId,
+      'createdAt': timestamp,
+      'delivered': false, // initialiser à false
+      'isNew': true, // le message est nouveau
+    });
+
+    // Mettre à jour l'état après l'envoi si nécessaire
+    if (currentUserId != null) {
+      _updateMessageDeliveryStatus(currentUserId);
+    }
+  }
+
+  Future<void> _updateMessageDeliveryStatus(String currentUserId) async {
+    // Mettre à jour les messages précédents
+    QuerySnapshot messagesSnapshot = await FirebaseFirestore.instance
+        .collection('messages')
+        .where('receiverId', isEqualTo: currentUserId)
+        .where('createdAt', isLessThan: Timestamp.now())
+        .get();
+
+    for (var doc in messagesSnapshot.docs) {
+      // Mettez à jour le statut à delivered = true
+      await doc.reference.update({'delivered': true, 'isNew': false});
+    }
+  }
+
+  Widget _buildMessageItem(Message message) {
+    if (message.isNew) {
+      return Row(
+        children: [
+          // Affichage du message
+          Text(message.text),
+          // Affichage des coches
+          Icon(Icons.check,
+              color: Colors.grey), // Une coche grise pour un nouveau message
+        ],
+      );
+    } else {
+      if (message.delivered) {
+        return Row(
+          children: [
+            // Affichage du message
+            Text(message.text),
+            // Affichage des coches
+            Icon(Icons.check, color: Colors.blue), // Coche bleue
+            Icon(Icons.check, color: Colors.blue), // Deuxième coche bleue
+          ],
+        );
+      } else {
+        return Row(
+          children: [
+            // Affichage du message
+            Text(message.text),
+            // Affichage des coches
+            Icon(Icons.check, color: Colors.grey), // Une coche grise
+          ],
+        );
+      }
+    }
   }
 
   void _markMessagesAsRead(String userId) async {
@@ -432,6 +507,34 @@ class _HomePageState extends State<HomePage> {
         await batch.commit();
       } catch (e) {
         print("Error marking messages as read: $e");
+      }
+    }
+  }
+
+  Future<void> _updateDeliveredStatusOnLogout() async {
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+    if (currentUserId != null) {
+      try {
+        // Mettre à jour le champ isActive à false dans la collection users
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(currentUserId)
+            .update({'isActive': false});
+
+        // Mettez à jour les messages pour les définir comme livrés
+        QuerySnapshot messagesSnapshot = await FirebaseFirestore.instance
+            .collection('messages')
+            .where('receiverId', isEqualTo: currentUserId)
+            .where('delivered', isEqualTo: false)
+            .get();
+
+        WriteBatch batch = FirebaseFirestore.instance.batch();
+        for (var doc in messagesSnapshot.docs) {
+          batch.update(doc.reference, {'delivered': true});
+        }
+        await batch.commit();
+      } catch (e) {
+        print("Error updating delivered status on logout: $e");
       }
     }
   }

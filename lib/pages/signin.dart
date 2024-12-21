@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -65,6 +66,12 @@ class _SignInState extends State<SignIn> {
       );
 
       if (userCredential.user != null) {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userCredential.user!.uid)
+            .update({
+          'isActive': true
+        }); // Définir isActive sur true lors de la connexion
         // Redirect to the Home page
         Navigator.pushReplacement(
           context,
