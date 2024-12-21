@@ -3,8 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class ChatPage extends StatefulWidget {
-  final String userId; // ID of the user you're chatting with
-  final String userName; // Name of the user you're chatting with
+  final String userId; // ID de l'utilisateur avec qui vous discutez
+  final String userName; // Nom de l'utilisateur avec qui vous discutez
 
   const ChatPage({super.key, required this.userId, required this.userName});
 
@@ -13,73 +13,50 @@ class ChatPage extends StatefulWidget {
 }
 
 class _ChatPageState extends State<ChatPage> {
-  TextEditingController _controller = TextEditingController();
-  List<Map<String, dynamic>> _messages = [];
-  bool _isTyping = false;
-
-  // Firestore instance
+  final TextEditingController _controller = TextEditingController();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final String currentUserId =
-      FirebaseAuth.instance.currentUser!.uid; // Get the current user's ID
+  final String currentUserId = FirebaseAuth.instance.currentUser!.uid;
 
-  void _sendMessage() {
+  // Envoyer un message
+  void _sendMessage() async {
     if (_controller.text.isNotEmpty) {
-      // Add message to Firestore
-      _firestore.collection('messages').add({
+      await _firestore.collection('messages').add({
         'text': _controller.text,
-        'createdAt': Timestamp.now(),
+        'createdAt': FieldValue.serverTimestamp(),
         'senderId': currentUserId,
-        'receiverId': widget.userId, // Store the ID of the receiver
+        'receiverId': widget.userId,
+        'isRead': false, // Par défaut, le message est marqué comme non lu
+        'delivered': false, // Par défaut, le message est marqué comme non livré
       });
 
       _controller.clear();
-      setState(() {
-        _isTyping = false;
-      });
     }
   }
 
-  void _onTyping(String text) {
-    setState(() {
-      _isTyping = text.isNotEmpty;
-    });
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    // Listen for messages for the current conversation
-    _firestore
+  // Marquer les messages comme lus
+  void _markMessagesAsRead() async {
+    final messages = await _firestore
         .collection('messages')
-        .where('senderId', whereIn: [currentUserId, widget.userId])
-        .where('receiverId', whereIn: [currentUserId, widget.userId])
-        .orderBy('createdAt')
-        .snapshots()
-        .listen((snapshot) {
-          snapshot.docChanges.forEach((change) {
-            if (change.type == DocumentChangeType.added) {
-              setState(() {
-                _messages.insert(0, {
-                  'text': change.doc['text'],
-                  'senderId': change.doc['senderId'],
-                  'receiverId': change.doc['receiverId'],
-                }); // Insert message at the top
-              });
-            }
-          });
-        });
+        .where('receiverId', isEqualTo: currentUserId)
+        .where('senderId', isEqualTo: widget.userId)
+        .where('isRead', isEqualTo: false)
+        .get();
+
+    for (var doc in messages.docs) {
+      doc.reference.update({'isRead': true, 'delivered': true});
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.userName), // Display the user's name
+        title: Text(widget.userName),
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () {
-              // Handle logout functionality here
+              // Gérer la déconnexion
             },
           ),
         ],
@@ -87,40 +64,151 @@ class _ChatPageState extends State<ChatPage> {
       body: Column(
         children: [
           Expanded(
-            child: ListView.builder(
-              reverse: true,
-              itemCount: _messages.length,
-              itemBuilder: (context, index) {
-                bool isSender = _messages[index]['senderId'] ==
-                    currentUserId; // Check if the current user sent the message
-                return Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Align(
-                    alignment:
-                        isSender ? Alignment.centerRight : Alignment.centerLeft,
-                    child: Container(
+            child: StreamBuilder<QuerySnapshot>(
+              stream: _firestore
+                  .collection('messages')
+                  .where('senderId', whereIn: [currentUserId, widget.userId])
+                  .where('receiverId', whereIn: [currentUserId, widget.userId])
+                  .orderBy('createdAt', descending: true)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (snapshot.hasError) {
+                  return Center(
+                      child: Text('Error: ${snapshot.error.toString()}'));
+                }
+                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                  return const Center(child: Text('No messages yet.'));
+                }
+
+                final messages = snapshot.data!.docs;
+
+                // Marquer les messages comme lus lorsque l'utilisateur est dans le chat
+                _markMessagesAsRead();
+
+                return ListView.builder(
+                  reverse: true,
+                  itemCount: messages.length,
+                  itemBuilder: (context, index) {
+                    final message = messages[index];
+                    final isSender = message['senderId'] == currentUserId;
+
+                    return Padding(
                       padding: const EdgeInsets.symmetric(
-                          vertical: 12, horizontal: 18),
-                      decoration: BoxDecoration(
-                        color: isSender ? Colors.blueAccent : Colors.grey[200],
-                        borderRadius: BorderRadius.circular(15),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black26,
-                            offset: const Offset(0, 2),
-                            blurRadius: 6,
+                          vertical: 8, horizontal: 16),
+                      child: Row(
+                        mainAxisAlignment: isSender
+                            ? MainAxisAlignment.end
+                            : MainAxisAlignment.start,
+                        children: [
+                          if (!isSender)
+                            CircleAvatar(
+                              backgroundColor: Colors.grey[300],
+                              child: Text(
+                                widget.userName[0].toUpperCase(),
+                                style: const TextStyle(color: Colors.black),
+                              ),
+                            ),
+                          if (!isSender) const SizedBox(width: 8),
+                          Flexible(
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 250),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    vertical: 10, horizontal: 14),
+                                decoration: BoxDecoration(
+                                  color: isSender
+                                      ? Color.fromARGB(144, 248, 74, 248)
+                                      : Colors.grey[200],
+                                  borderRadius: BorderRadius.only(
+                                    topLeft: const Radius.circular(15),
+                                    topRight: const Radius.circular(15),
+                                    bottomLeft: isSender
+                                        ? const Radius.circular(15)
+                                        : const Radius.circular(0),
+                                    bottomRight: isSender
+                                        ? const Radius.circular(0)
+                                        : const Radius.circular(15),
+                                  ),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      message['text'],
+                                      style: TextStyle(
+                                        color: isSender
+                                            ? Colors.white
+                                            : Colors.black87,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 5),
+                                    if (isSender) // Afficher les coches uniquement pour les messages envoyés
+                                      Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.end,
+                                        children: [
+                                          // Vérifier si le message a été envoyé mais pas reçu
+                                          if (!message[
+                                              'delivered']) // Message envoyé mais non reçu
+                                            Icon(
+                                              Icons.check,
+                                              size: 16,
+                                              color: Colors
+                                                  .grey, // Une coche grise pour non reçu
+                                            ),
+                                          // Vérifier si le message a été reçu mais non lu
+                                          if (message['delivered'] &&
+                                              !message[
+                                                  'isRead']) // Message reçu mais non lu
+                                            ...[
+                                            Icon(
+                                              Icons.check,
+                                              size: 16,
+                                              color: Colors
+                                                  .grey, // Première coche grise
+                                            ),
+                                            const SizedBox(
+                                                width: 2), // Espacement
+                                            Icon(
+                                              Icons.check,
+                                              size: 16,
+                                              color: Colors
+                                                  .grey, // Deuxième coche grise
+                                            ),
+                                          ],
+                                          // Vérifier si le message a été lu
+                                          if (message[
+                                              'isRead']) // Message reçu et lu
+                                            ...[
+                                            Icon(
+                                              Icons.check,
+                                              size: 16,
+                                              color: Colors
+                                                  .blue, // Première coche bleue
+                                            ),
+                                            const SizedBox(
+                                                width: 2), // Espacement
+                                            Icon(
+                                              Icons.check,
+                                              size: 16,
+                                              color: Colors
+                                                  .blue, // Deuxième coche bleue
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ),
                           ),
                         ],
                       ),
-                      child: Text(
-                        _messages[index]['text'],
-                        style: TextStyle(
-                          color: isSender ? Colors.white : Colors.black87,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ),
-                  ),
+                    );
+                  },
                 );
               },
             ),
@@ -132,7 +220,6 @@ class _ChatPageState extends State<ChatPage> {
                 Expanded(
                   child: TextField(
                     controller: _controller,
-                    onChanged: _onTyping,
                     decoration: InputDecoration(
                       hintText: 'Type a message...',
                       filled: true,
@@ -147,10 +234,7 @@ class _ChatPageState extends State<ChatPage> {
                   ),
                 ),
                 IconButton(
-                  icon: Icon(
-                    _isTyping ? Icons.send : Icons.mic,
-                    color: Colors.blueAccent,
-                  ),
+                  icon: const Icon(Icons.send, color: Colors.blueAccent),
                   onPressed: _sendMessage,
                 ),
               ],

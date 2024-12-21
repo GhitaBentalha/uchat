@@ -4,6 +4,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'chatpage.dart'; // Adjust the import path as necessary
 
 class UserSelectionPage extends StatefulWidget {
+  const UserSelectionPage({super.key});
+
   @override
   _UserSelectionPageState createState() => _UserSelectionPageState();
 }
@@ -29,7 +31,7 @@ class _UserSelectionPageState extends State<UserSelectionPage> {
     final usersSnapshot = await FirebaseFirestore.instance
         .collection('users') // Your collection for user profiles
         .where('email', isGreaterThanOrEqualTo: query)
-        .where('email', isLessThanOrEqualTo: query + '\uf8ff')
+        .where('email', isLessThanOrEqualTo: '$query\uf8ff')
         .get();
 
     setState(() {
