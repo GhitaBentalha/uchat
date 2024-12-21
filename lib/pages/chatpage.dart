@@ -211,16 +211,34 @@ class _ChatPageState extends State<ChatPage> {
                                               ),
                                             if (message['delivered'] &&
                                                 !message['isRead'])
-                                              Icon(
-                                                Icons.check,
-                                                size: 16,
-                                                color: Colors.grey,
+                                              Row(
+                                                children: [
+                                                  Icon(
+                                                    Icons.check,
+                                                    size: 16,
+                                                    color: Colors.grey,
+                                                  ),
+                                                  Icon(
+                                                    Icons.check,
+                                                    size: 16,
+                                                    color: Colors.grey,
+                                                  ),
+                                                ],
                                               ),
                                             if (message['isRead'])
-                                              Icon(
-                                                Icons.check,
-                                                size: 16,
-                                                color: Colors.blue,
+                                              Row(
+                                                children: [
+                                                  Icon(
+                                                    Icons.check,
+                                                    size: 16,
+                                                    color: Colors.blue,
+                                                  ),
+                                                  Icon(
+                                                    Icons.check,
+                                                    size: 16,
+                                                    color: Colors.blue,
+                                                  ),
+                                                ],
                                               ),
                                           ],
                                         ),
