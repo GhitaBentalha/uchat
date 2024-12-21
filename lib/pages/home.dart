@@ -247,7 +247,7 @@ class _HomePageState extends State<HomePage> {
                 onChanged: _filterChatHistory,
               )
             : const Text('ChatUp'),
-        backgroundColor: Colors.purple,
+        backgroundColor: Color.fromARGB(186, 101, 11, 103),
         actions: [
           IconButton(
             icon: Icon(_isSearching ? Icons.close : Icons.search),
@@ -274,17 +274,39 @@ class _HomePageState extends State<HomePage> {
                       final chat = _filteredChatHistory[index];
                       return ListTile(
                         leading: UserAvatar(userName: chat['userName']),
-                        title: Text(chat['userName']),
+                        title: Text(
+                          chat['userName'],
+                          style: TextStyle(
+                            color: chat['newMessagesCount'] > 0
+                                ? Color.fromARGB(255, 19, 162, 36)
+                                : Colors.black,
+                            fontWeight: chat['newMessagesCount'] > 0
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                          ),
+                        ),
                         subtitle: Row(
                           children: [
-                            Expanded(child: Text(chat['lastMessage'])),
+                            Expanded(
+                              child: Text(
+                                chat['lastMessage'],
+                                style: TextStyle(
+                                  color: chat['newMessagesCount'] > 0
+                                      ? Color.fromARGB(255, 123, 188, 131)
+                                      : Colors.black,
+                                  fontWeight: chat['newMessagesCount'] > 0
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                                ),
+                              ),
+                            ),
                             if (chat['newMessagesCount'] > 0)
                               Container(
                                 margin: const EdgeInsets.only(left: 8.0),
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 8.0, vertical: 4.0),
                                 decoration: BoxDecoration(
-                                  color: Colors.red,
+                                  color: const Color.fromARGB(255, 5, 88, 15),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Text(
@@ -324,7 +346,7 @@ class _HomePageState extends State<HomePage> {
             _fetchChatHistory();
           });
         },
-        backgroundColor: Colors.purple,
+        backgroundColor: Color.fromARGB(186, 101, 11, 103),
         child: const Icon(Icons.chat),
       ),
       drawer: Drawer(
@@ -340,7 +362,8 @@ class _HomePageState extends State<HomePage> {
                   return UserAccountsDrawerHeader(
                     accountName: Text('Loading...'),
                     accountEmail: Text('Loading...'),
-                    decoration: BoxDecoration(color: Colors.purple),
+                    decoration:
+                        BoxDecoration(color: Color.fromARGB(186, 101, 11, 103)),
                     currentAccountPicture: CircleAvatar(
                       backgroundColor: Colors.white,
                       child: CircularProgressIndicator(),
@@ -352,11 +375,12 @@ class _HomePageState extends State<HomePage> {
                   return UserAccountsDrawerHeader(
                     accountName: Text('Error'),
                     accountEmail: Text('Error'),
-                    decoration: BoxDecoration(color: Colors.purple),
+                    decoration:
+                        BoxDecoration(color: Color.fromARGB(186, 101, 11, 103)),
                     currentAccountPicture: CircleAvatar(
                       backgroundColor: Colors.white,
-                      child:
-                          Icon(Icons.error, color: Colors.purple, size: 40.0),
+                      child: Icon(Icons.error,
+                          color: Color.fromARGB(186, 101, 11, 103), size: 40.0),
                     ),
                   );
                 } else {
@@ -364,14 +388,17 @@ class _HomePageState extends State<HomePage> {
                   return UserAccountsDrawerHeader(
                     accountName: Text('Welcome ${userData['name'] ?? 'User'}'),
                     accountEmail: Text(user?.email ?? 'No Email'),
-                    decoration: BoxDecoration(color: Colors.purple),
+                    decoration:
+                        BoxDecoration(color: Color.fromARGB(186, 101, 11, 103)),
                     currentAccountPicture: CircleAvatar(
                       backgroundColor: Colors.white,
                       child: Text(
                         userData['name'] != null && userData['name'].isNotEmpty
                             ? userData['name'][0].toUpperCase()
                             : '?',
-                        style: TextStyle(fontSize: 40.0, color: Colors.purple),
+                        style: TextStyle(
+                            fontSize: 40.0,
+                            color: Color.fromARGB(186, 101, 11, 103)),
                       ),
                     ),
                   );

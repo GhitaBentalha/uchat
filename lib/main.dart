@@ -24,6 +24,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData.light(), // Define your light theme here
       darkTheme: ThemeData.dark(), // Define your dark theme here
       themeMode: themeProvider.isDarkMode ? ThemeMode.dark : ThemeMode.light,
+      debugShowCheckedModeBanner: false,
       home: SignUp(),
     );
   }

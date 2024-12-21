@@ -226,8 +226,9 @@ class _ChatPageState extends State<ChatPage> {
                                       vertical: 10, horizontal: 14),
                                   decoration: BoxDecoration(
                                     color: isSender
-                                        ? Color.fromARGB(144, 248, 74, 248)
-                                        : Colors.grey[200],
+                                        ? Color.fromARGB(186, 101, 11, 103)
+                                        : const Color.fromARGB(
+                                            255, 216, 216, 216),
                                     borderRadius: BorderRadius.only(
                                       topLeft: const Radius.circular(15),
                                       topRight: const Radius.circular(15),
