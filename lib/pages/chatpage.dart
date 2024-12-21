@@ -53,29 +53,33 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   // Afficher une boîte de dialogue de confirmation pour la suppression
-  void _showDeleteConfirmation(String messageId) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Supprimer le message'),
-        content: const Text('Êtes-vous sûr de vouloir supprimer ce message ?'),
-        actions: [
-          TextButton(
-            child: const Text('Annuler'),
-            onPressed: () {
-              Navigator.of(ctx).pop();
-            },
-          ),
-          TextButton(
-            child: const Text('Supprimer'),
-            onPressed: () {
-              _deleteMessage(messageId);
-              Navigator.of(ctx).pop();
-            },
-          ),
-        ],
-      ),
-    );
+  // Afficher une boîte de dialogue de confirmation pour la suppression
+  void _showDeleteConfirmation(String messageId, bool isSender) {
+    if (isSender) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Supprimer le message'),
+          content:
+              const Text('Êtes-vous sûr de vouloir supprimer ce message ?'),
+          actions: [
+            TextButton(
+              child: const Text('Annuler'),
+              onPressed: () {
+                Navigator.of(ctx).pop();
+              },
+            ),
+            TextButton(
+              child: const Text('Supprimer'),
+              onPressed: () {
+                _deleteMessage(messageId);
+                Navigator.of(ctx).pop();
+              },
+            ),
+          ],
+        ),
+      );
+    }
   }
 
   @override
@@ -113,6 +117,7 @@ class _ChatPageState extends State<ChatPage> {
                 // Marquer les messages comme lus lorsque l'utilisateur est dans le chat
                 _markMessagesAsRead();
 
+// Dans le ListView.builder, mettez à jour le GestureDetector
                 return ListView.builder(
                   reverse: true,
                   itemCount: messages.length,
@@ -123,7 +128,8 @@ class _ChatPageState extends State<ChatPage> {
                     return GestureDetector(
                       onLongPress: () {
                         // Afficher la boîte de dialogue de confirmation pour supprimer le message
-                        _showDeleteConfirmation(message.id);
+                        // uniquement si l'utilisateur est l'expéditeur
+                        _showDeleteConfirmation(message.id, isSender);
                       },
                       child: Padding(
                         padding: const EdgeInsets.symmetric(
