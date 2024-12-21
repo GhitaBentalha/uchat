@@ -2,7 +2,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
 import 'package:uchat/pages/UserSelectionPage.dart';
+import 'package:uchat/pages/signin.dart';
+import 'package:uchat/theme_provider.dart';
 import 'chatpage.dart';
 import 'package:intl/intl.dart';
 
@@ -56,13 +59,6 @@ class _HomePageState extends State<HomePage> {
     _startTimer();
   }
 
-/*
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
-*/
   void _startTimer() {
     _timer = Timer.periodic(Duration(seconds: 10), (Timer timer) {
       _fetchChatHistory();
@@ -202,6 +198,8 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+
     return Scaffold(
       appBar: AppBar(
         title: _isSearching
@@ -217,13 +215,6 @@ class _HomePageState extends State<HomePage> {
               )
             : const Text('ChatUp'),
         backgroundColor: Colors.purple,
-        leading: IconButton(
-          icon: const Icon(Icons.logout), // Logout button
-          onPressed: () async {
-            await FirebaseAuth.instance.signOut();
-            Navigator.pop(context);
-          },
-        ),
         actions: [
           IconButton(
             icon: Icon(_isSearching ? Icons.close : Icons.search),
@@ -302,6 +293,104 @@ class _HomePageState extends State<HomePage> {
         backgroundColor: Colors.purple,
         child: const Icon(Icons.chat),
       ),
+      drawer: Drawer(
+        child: Column(
+          children: [
+            FutureBuilder<DocumentSnapshot>(
+              future: FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(user?.uid)
+                  .get(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return UserAccountsDrawerHeader(
+                    accountName: Text('Loading...'),
+                    accountEmail: Text('Loading...'),
+                    decoration: BoxDecoration(color: Colors.purple),
+                    currentAccountPicture: CircleAvatar(
+                      backgroundColor: Colors.white,
+                      child: CircularProgressIndicator(),
+                    ),
+                  );
+                } else if (snapshot.hasError ||
+                    !snapshot.hasData ||
+                    !snapshot.data!.exists) {
+                  return UserAccountsDrawerHeader(
+                    accountName: Text('Error'),
+                    accountEmail: Text('Error'),
+                    decoration: BoxDecoration(color: Colors.purple),
+                    currentAccountPicture: CircleAvatar(
+                      backgroundColor: Colors.white,
+                      child:
+                          Icon(Icons.error, color: Colors.purple, size: 40.0),
+                    ),
+                  );
+                } else {
+                  var userData = snapshot.data!.data() as Map<String, dynamic>;
+                  return UserAccountsDrawerHeader(
+                    accountName: Text('Welcome ${userData['name'] ?? 'User'}'),
+                    accountEmail: Text(user?.email ?? 'No Email'),
+                    decoration: BoxDecoration(color: Colors.purple),
+                    currentAccountPicture: CircleAvatar(
+                      backgroundColor: Colors.white,
+                      child: Text(
+                        userData['name'] != null && userData['name'].isNotEmpty
+                            ? userData['name'][0].toUpperCase()
+                            : '?',
+                        style: TextStyle(fontSize: 40.0, color: Colors.purple),
+                      ),
+                    ),
+                  );
+                }
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.settings),
+              title: Text('Settings'),
+              onTap: () {
+                // Navigate to settings
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.dark_mode),
+              title: Text('Change Theme'),
+              onTap: () {
+                // Toggle the dark mode state
+                Provider.of<ThemeProvider>(context, listen: false)
+                    .toggleTheme();
+                Navigator.of(context).pop(); // Close the drawer
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.person),
+              title: Text('Profile'),
+              onTap: () {
+                // Navigate to profile
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.logout),
+              title: Text('Logout'),
+              onTap: () async {
+                await FirebaseAuth.instance.signOut();
+                // Optionally reset any state variables here
+                // Redirect or update the UI as necessary
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(
+                      builder: (context) => SignIn()), // Your login page widget
+                  (Route<dynamic> route) => false,
+                );
+              },
+            ),
+          ],
+        ),
+      ),
     );
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel(); // Cancel the timer when disposing
+    super.dispose();
   }
 }

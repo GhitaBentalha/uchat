@@ -1,21 +1,30 @@
-import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:uchat/pages/signup.dart';
-// Import your home page (you'll need to create it)
+import 'theme_provider.dart'; // Import your ThemeProvider
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
-  runApp(MyApp());
+  runApp(
+    ChangeNotifierProvider(
+      create: (context) => ThemeProvider(),
+      child: MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
   @override
   Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
     return MaterialApp(
-        home: const SignUp() // Set the SignUp screen as the entry point
-        );
+      title: 'Chat App',
+      theme: ThemeData.light(), // Define your light theme here
+      darkTheme: ThemeData.dark(), // Define your dark theme here
+      themeMode: themeProvider.isDarkMode ? ThemeMode.dark : ThemeMode.light,
+      home: SignUp(),
+    );
   }
 }

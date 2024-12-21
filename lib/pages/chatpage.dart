@@ -49,17 +49,11 @@ class _ChatPageState extends State<ChatPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.userName),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () {
-              // Gérer la déconnexion
-            },
-          ),
-        ],
       ),
       body: Column(
         children: [
@@ -223,13 +217,17 @@ class _ChatPageState extends State<ChatPage> {
                     decoration: InputDecoration(
                       hintText: 'Type a message...',
                       filled: true,
-                      fillColor: Colors.grey[200],
+                      fillColor:
+                          isDarkMode ? Colors.grey[800] : Colors.grey[200],
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(30),
                         borderSide: BorderSide.none,
                       ),
                       contentPadding: const EdgeInsets.symmetric(
                           vertical: 12, horizontal: 16),
+                    ),
+                    style: TextStyle(
+                      color: isDarkMode ? Colors.white : Colors.black,
                     ),
                   ),
                 ),
