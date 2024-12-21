@@ -122,12 +122,20 @@ class _HomePageState extends State<HomePage> {
           if (userDoc.exists) {
             String userName = userDoc['name'] ?? 'Unknown';
 
-            // Vérifiez si le message est reçu et n'a pas été lu
+            // Compter uniquement les nouveaux messages reçus qui ne sont pas encore marqués comme livrés
             int newMessagesCount = (message['receiverId'] == currentUserId &&
                     !message['delivered'])
                 ? 1
                 : 0;
 
+            // Mise à jour du compteur des messages non lus si l'utilisateur a déjà une conversation avec cet autre utilisateur
+            if (latestMessages.containsKey(otherUserId)) {
+              newMessagesCount +=
+                  (latestMessages[otherUserId]!['newMessagesCount'] ?? 0)
+                      as int;
+            }
+
+            // Mettre à jour le dernier message si c'est le plus récent
             if (!latestMessages.containsKey(otherUserId) ||
                 (message['timestamp'] as Timestamp)
                         .compareTo(latestMessages[otherUserId]!['timestamp']) >
@@ -137,8 +145,9 @@ class _HomePageState extends State<HomePage> {
                 'timestamp': message['timestamp'],
                 'userId': otherUserId,
                 'userName': userName,
-                'newMessagesCount': newMessagesCount, // Count of new messages
-                'delivered': message['delivered'], // Add delivered status
+                'newMessagesCount':
+                    newMessagesCount, // Total des nouveaux messages
+                'delivered': message['delivered'], // État de livraison
               };
             }
           } else {
@@ -146,7 +155,7 @@ class _HomePageState extends State<HomePage> {
           }
         }
 
-        // Convert the latest messages map to a list and sort it by timestamp (latest first)
+        // Convertir la carte des derniers messages en une liste et la trier par timestamp (dernier d'abord)
         setState(() {
           _chatHistory = latestMessages.entries.map((entry) {
             return {
@@ -154,14 +163,13 @@ class _HomePageState extends State<HomePage> {
               'userName': entry.value['userName'],
               'lastMessage': entry.value['lastMessage'],
               'time': entry.value['timestamp'],
-              'newMessagesCount':
-                  entry.value['newMessagesCount'], // New messages count
-              'delivered': entry
-                  .value['delivered'], // Add delivered status to chat history
+              'newMessagesCount': entry
+                  .value['newMessagesCount'], // Compte des nouveaux messages
+              'delivered': entry.value['delivered'], // État de livraison
             };
           }).toList()
-            ..sort((a, b) =>
-                (b['time'] as Timestamp).compareTo(a['time'])); // Sort by time
+            ..sort((a, b) => (b['time'] as Timestamp)
+                .compareTo(a['time'])); // Trier par temps
         });
 
         print("Chat history: $_chatHistory");
@@ -230,8 +238,7 @@ class _HomePageState extends State<HomePage> {
                     children: [
                       Expanded(child: Text(chat['lastMessage'])),
                       // Affiche la bulle rouge uniquement si c'est un message reçu et non lu
-                      if (chat['newMessagesCount'] > 0 &&
-                          chat['delivered'] == false)
+                      if (chat['newMessagesCount'] > 0)
                         Container(
                           margin: const EdgeInsets.only(left: 8.0),
                           padding: const EdgeInsets.symmetric(
@@ -257,7 +264,10 @@ class _HomePageState extends State<HomePage> {
                           userName: chat['userName'],
                         ),
                       ),
-                    );
+                    ).then((value) {
+                      // Re-fetch chat history to update the new messages count
+                      _fetchChatHistory();
+                    });
                   },
                 );
               },
@@ -266,13 +276,14 @@ class _HomePageState extends State<HomePage> {
         onPressed: () {
           Navigator.push(
             context,
-            MaterialPageRoute(
-              builder: (context) => UserSelectionPage(),
-            ),
-          );
+            MaterialPageRoute(builder: (context) => UserSelectionPage()),
+          ).then((value) {
+            // Re-fetch chat history to update the new messages count
+            _fetchChatHistory();
+          });
         },
         backgroundColor: Colors.purple,
-        child: const Icon(Icons.message),
+        child: const Icon(Icons.chat),
       ),
     );
   }
