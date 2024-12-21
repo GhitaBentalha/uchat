@@ -57,6 +57,30 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     _fetchChatHistory();
     _startTimer();
+    _updateDeliveredStatus();
+  }
+
+  void _updateDeliveredStatus() async {
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+    if (currentUserId != null) {
+      try {
+        // Fetch all messages where the receiver is the current user and delivered is false
+        QuerySnapshot messagesSnapshot = await FirebaseFirestore.instance
+            .collection('messages')
+            .where('receiverId', isEqualTo: currentUserId)
+            .where('delivered', isEqualTo: false)
+            .get();
+
+        // Update the delivered status of each message using a batch
+        WriteBatch batch = FirebaseFirestore.instance.batch();
+        for (var doc in messagesSnapshot.docs) {
+          batch.update(doc.reference, {'delivered': true});
+        }
+        await batch.commit();
+      } catch (e) {
+        print("Error updating delivered status: $e");
+      }
+    }
   }
 
   void _startTimer() {
@@ -88,7 +112,7 @@ class _HomePageState extends State<HomePage> {
             'receiverId': doc['receiverId'],
             'text': doc['text'],
             'timestamp': doc['createdAt'],
-            'delivered': doc['delivered'] ?? false,
+            'isRead': doc['isRead'] ?? false,
           });
         }
 
@@ -98,7 +122,7 @@ class _HomePageState extends State<HomePage> {
             'receiverId': doc['receiverId'],
             'text': doc['text'],
             'timestamp': doc['createdAt'],
-            'delivered': doc['delivered'] ?? false,
+            'isRead': doc['isRead'] ?? false,
           });
         }
 
@@ -116,10 +140,11 @@ class _HomePageState extends State<HomePage> {
           if (userDoc.exists) {
             String userName = userDoc['name'] ?? 'Unknown';
 
-            int newMessagesCount = (message['receiverId'] == currentUserId &&
-                    !message['delivered'])
-                ? 1
-                : 0;
+            // Calculer le nombre de nouveaux messages non lus
+            int newMessagesCount =
+                (message['receiverId'] == currentUserId && !message['isRead'])
+                    ? 1
+                    : 0;
 
             if (latestMessages.containsKey(otherUserId)) {
               newMessagesCount +=
@@ -137,7 +162,7 @@ class _HomePageState extends State<HomePage> {
                 'userId': otherUserId,
                 'userName': userName,
                 'newMessagesCount': newMessagesCount,
-                'delivered': message['delivered'],
+                'isRead': message['isRead'],
               };
             }
           }
@@ -151,12 +176,12 @@ class _HomePageState extends State<HomePage> {
               'lastMessage': entry.value['lastMessage'],
               'time': entry.value['timestamp'],
               'newMessagesCount': entry.value['newMessagesCount'],
-              'delivered': entry.value['delivered'],
+              'isRead': entry.value['isRead'],
             };
           }).toList()
             ..sort((a, b) => (b['time'] as Timestamp).compareTo(a['time']));
           _filteredChatHistory =
-              List.from(_chatHistory); // Initialize filtered chat history
+              List.from(_chatHistory); // Initialiser l'historique filtré
         });
       } catch (e) {
         print("Error fetching messages: $e");
@@ -263,6 +288,7 @@ class _HomePageState extends State<HomePage> {
                         ),
                         trailing: Text(_formatTime(chat['time'] as Timestamp)),
                         onTap: () {
+                          _markMessagesAsRead(chat['userId']);
                           Navigator.push(
                             context,
                             MaterialPageRoute(
@@ -386,6 +412,28 @@ class _HomePageState extends State<HomePage> {
         ),
       ),
     );
+  }
+
+  void _markMessagesAsRead(String userId) async {
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+    if (currentUserId != null) {
+      try {
+        QuerySnapshot messagesSnapshot = await FirebaseFirestore.instance
+            .collection('messages')
+            .where('senderId', isEqualTo: userId)
+            .where('receiverId', isEqualTo: currentUserId)
+            .where('isRead', isEqualTo: false)
+            .get();
+
+        WriteBatch batch = FirebaseFirestore.instance.batch();
+        for (var doc in messagesSnapshot.docs) {
+          batch.update(doc.reference, {'isRead': true});
+        }
+        await batch.commit();
+      } catch (e) {
+        print("Error marking messages as read: $e");
+      }
+    }
   }
 
   @override

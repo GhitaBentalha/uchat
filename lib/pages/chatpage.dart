@@ -3,8 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class ChatPage extends StatefulWidget {
-  final String userId; // ID de l'utilisateur avec qui vous discutez
-  final String userName; // Nom de l'utilisateur avec qui vous discutez
+  final String userId; // ID of the user you're chatting with
+  final String userName; // Name of the user you're chatting with
 
   const ChatPage({super.key, required this.userId, required this.userName});
 
@@ -17,7 +17,33 @@ class _ChatPageState extends State<ChatPage> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final String currentUserId = FirebaseAuth.instance.currentUser!.uid;
 
-  // Envoyer un message
+  // Mark messages as read
+  void _markMessagesAsReadOnInit(String chatUserId) async {
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+    if (currentUserId != null) {
+      QuerySnapshot unreadMessages = await FirebaseFirestore.instance
+          .collection('messages')
+          .where('senderId', isEqualTo: chatUserId)
+          .where('receiverId', isEqualTo: currentUserId)
+          .where('isRead', isEqualTo: false)
+          .get();
+
+      WriteBatch batch = FirebaseFirestore.instance.batch();
+      for (var doc in unreadMessages.docs) {
+        batch.update(doc.reference, {'isRead': true});
+      }
+      await batch.commit();
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _markMessagesAsReadOnInit(
+        widget.userId); // Mark messages as read when accessing the chat
+  }
+
+  // Send a message
   void _sendMessage() async {
     if (_controller.text.isNotEmpty) {
       await _firestore.collection('messages').add({
@@ -25,52 +51,36 @@ class _ChatPageState extends State<ChatPage> {
         'createdAt': FieldValue.serverTimestamp(),
         'senderId': currentUserId,
         'receiverId': widget.userId,
-        'isRead': false, // Par défaut, le message est marqué comme non lu
-        'delivered': false, // Par défaut, le message est marqué comme non livré
+        'isRead': false, // By default, the message is marked as unread
+        'delivered': false, // By default, the message is marked as undelivered
       });
 
       _controller.clear();
     }
   }
 
-  // Marquer les messages comme lus
-  void _markMessagesAsRead() async {
-    final messages = await _firestore
-        .collection('messages')
-        .where('receiverId', isEqualTo: currentUserId)
-        .where('senderId', isEqualTo: widget.userId)
-        .where('isRead', isEqualTo: false)
-        .get();
-
-    for (var doc in messages.docs) {
-      doc.reference.update({'isRead': true, 'delivered': true});
-    }
-  }
-
-  // Supprimer un message
+  // Delete a message
   void _deleteMessage(String messageId) async {
     await _firestore.collection('messages').doc(messageId).delete();
   }
 
-  // Afficher une boîte de dialogue de confirmation pour la suppression
-  // Afficher une boîte de dialogue de confirmation pour la suppression
+  // Show a confirmation dialog for deletion
   void _showDeleteConfirmation(String messageId, bool isSender) {
     if (isSender) {
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: const Text('Supprimer le message'),
-          content:
-              const Text('Êtes-vous sûr de vouloir supprimer ce message ?'),
+          title: const Text('Delete Message'),
+          content: const Text('Are you sure you want to delete this message?'),
           actions: [
             TextButton(
-              child: const Text('Annuler'),
+              child: const Text('Cancel'),
               onPressed: () {
                 Navigator.of(ctx).pop();
               },
             ),
             TextButton(
-              child: const Text('Supprimer'),
+              child: const Text('Delete'),
               onPressed: () {
                 _deleteMessage(messageId);
                 Navigator.of(ctx).pop();
@@ -88,7 +98,26 @@ class _ChatPageState extends State<ChatPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.userName),
+        title: Row(
+          children: [
+            CircleAvatar(
+              backgroundColor: Colors.grey[300],
+              child: Text(
+                widget.userName[0].toUpperCase(),
+                style: const TextStyle(color: Colors.black),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(widget.userName),
+            const Spacer(),
+            IconButton(
+              icon: const Icon(Icons.logout),
+              onPressed: () {
+                // Handle logout
+              },
+            ),
+          ],
+        ),
       ),
       body: Column(
         children: [
@@ -114,10 +143,6 @@ class _ChatPageState extends State<ChatPage> {
 
                 final messages = snapshot.data!.docs;
 
-                // Marquer les messages comme lus lorsque l'utilisateur est dans le chat
-                _markMessagesAsRead();
-
-// Dans le ListView.builder, mettez à jour le GestureDetector
                 return ListView.builder(
                   reverse: true,
                   itemCount: messages.length,
@@ -127,8 +152,6 @@ class _ChatPageState extends State<ChatPage> {
 
                     return GestureDetector(
                       onLongPress: () {
-                        // Afficher la boîte de dialogue de confirmation pour supprimer le message
-                        // uniquement si l'utilisateur est l'expéditeur
                         _showDeleteConfirmation(message.id, isSender);
                       },
                       child: Padding(
@@ -139,14 +162,6 @@ class _ChatPageState extends State<ChatPage> {
                               ? MainAxisAlignment.end
                               : MainAxisAlignment.start,
                           children: [
-                            if (!isSender)
-                              CircleAvatar(
-                                backgroundColor: Colors.grey[300],
-                                child: Text(
-                                  widget.userName[0].toUpperCase(),
-                                  style: const TextStyle(color: Colors.black),
-                                ),
-                              ),
                             if (!isSender) const SizedBox(width: 8),
                             Flexible(
                               child: ConstrainedBox(
@@ -183,59 +198,30 @@ class _ChatPageState extends State<ChatPage> {
                                         ),
                                       ),
                                       const SizedBox(height: 5),
-                                      if (isSender) // Afficher les coches uniquement pour les messages envoyés
+                                      if (isSender) // Show checkmarks only for sent messages
                                         Row(
                                           mainAxisAlignment:
                                               MainAxisAlignment.end,
                                           children: [
-                                            // Vérifier si le message a été envoyé mais pas reçu
-                                            if (!message[
-                                                'delivered']) // Message envoyé mais non reçu
+                                            if (!message['delivered'])
                                               Icon(
                                                 Icons.check,
                                                 size: 16,
-                                                color: Colors
-                                                    .grey, // Une coche grise pour non reçu
+                                                color: Colors.grey,
                                               ),
-                                            // Vérifier si le message a été reçu mais non lu
                                             if (message['delivered'] &&
-                                                !message[
-                                                    'isRead']) // Message reçu mais non lu
-                                              ...[
+                                                !message['isRead'])
                                               Icon(
                                                 Icons.check,
                                                 size: 16,
-                                                color: Colors
-                                                    .grey, // Première coche grise
+                                                color: Colors.grey,
                                               ),
-                                              const SizedBox(
-                                                  width: 2), // Espacement
+                                            if (message['isRead'])
                                               Icon(
                                                 Icons.check,
                                                 size: 16,
-                                                color: Colors
-                                                    .grey, // Deuxième coche grise
+                                                color: Colors.blue,
                                               ),
-                                            ],
-                                            // Vérifier si le message a été lu
-                                            if (message[
-                                                'isRead']) // Message reçu et lu
-                                              ...[
-                                              Icon(
-                                                Icons.check,
-                                                size: 16,
-                                                color: Colors
-                                                    .blue, // Première coche bleue
-                                              ),
-                                              const SizedBox(
-                                                  width: 2), // Espacement
-                                              Icon(
-                                                Icons.check,
-                                                size: 16,
-                                                color: Colors
-                                                    .blue, // Deuxième coche bleue
-                                              ),
-                                            ],
                                           ],
                                         ),
                                     ],
@@ -243,6 +229,7 @@ class _ChatPageState extends State<ChatPage> {
                                 ),
                               ),
                             ),
+                            if (isSender) const SizedBox(width: 8),
                           ],
                         ),
                       ),
@@ -277,7 +264,7 @@ class _ChatPageState extends State<ChatPage> {
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.send, color: Colors.blueAccent),
+                  icon: const Icon(Icons.send),
                   onPressed: _sendMessage,
                 ),
               ],
