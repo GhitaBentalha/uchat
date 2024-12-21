@@ -47,6 +47,37 @@ class _ChatPageState extends State<ChatPage> {
     }
   }
 
+  // Supprimer un message
+  void _deleteMessage(String messageId) async {
+    await _firestore.collection('messages').doc(messageId).delete();
+  }
+
+  // Afficher une boîte de dialogue de confirmation pour la suppression
+  void _showDeleteConfirmation(String messageId) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Supprimer le message'),
+        content: const Text('Êtes-vous sûr de vouloir supprimer ce message ?'),
+        actions: [
+          TextButton(
+            child: const Text('Annuler'),
+            onPressed: () {
+              Navigator.of(ctx).pop();
+            },
+          ),
+          TextButton(
+            child: const Text('Supprimer'),
+            onPressed: () {
+              _deleteMessage(messageId);
+              Navigator.of(ctx).pop();
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
@@ -89,117 +120,125 @@ class _ChatPageState extends State<ChatPage> {
                     final message = messages[index];
                     final isSender = message['senderId'] == currentUserId;
 
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(
-                          vertical: 8, horizontal: 16),
-                      child: Row(
-                        mainAxisAlignment: isSender
-                            ? MainAxisAlignment.end
-                            : MainAxisAlignment.start,
-                        children: [
-                          if (!isSender)
-                            CircleAvatar(
-                              backgroundColor: Colors.grey[300],
-                              child: Text(
-                                widget.userName[0].toUpperCase(),
-                                style: const TextStyle(color: Colors.black),
+                    return GestureDetector(
+                      onLongPress: () {
+                        // Afficher la boîte de dialogue de confirmation pour supprimer le message
+                        _showDeleteConfirmation(message.id);
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 8, horizontal: 16),
+                        child: Row(
+                          mainAxisAlignment: isSender
+                              ? MainAxisAlignment.end
+                              : MainAxisAlignment.start,
+                          children: [
+                            if (!isSender)
+                              CircleAvatar(
+                                backgroundColor: Colors.grey[300],
+                                child: Text(
+                                  widget.userName[0].toUpperCase(),
+                                  style: const TextStyle(color: Colors.black),
+                                ),
                               ),
-                            ),
-                          if (!isSender) const SizedBox(width: 8),
-                          Flexible(
-                            child: ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 250),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                    vertical: 10, horizontal: 14),
-                                decoration: BoxDecoration(
-                                  color: isSender
-                                      ? Color.fromARGB(144, 248, 74, 248)
-                                      : Colors.grey[200],
-                                  borderRadius: BorderRadius.only(
-                                    topLeft: const Radius.circular(15),
-                                    topRight: const Radius.circular(15),
-                                    bottomLeft: isSender
-                                        ? const Radius.circular(15)
-                                        : const Radius.circular(0),
-                                    bottomRight: isSender
-                                        ? const Radius.circular(0)
-                                        : const Radius.circular(15),
+                            if (!isSender) const SizedBox(width: 8),
+                            Flexible(
+                              child: ConstrainedBox(
+                                constraints:
+                                    const BoxConstraints(maxWidth: 250),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      vertical: 10, horizontal: 14),
+                                  decoration: BoxDecoration(
+                                    color: isSender
+                                        ? Color.fromARGB(144, 248, 74, 248)
+                                        : Colors.grey[200],
+                                    borderRadius: BorderRadius.only(
+                                      topLeft: const Radius.circular(15),
+                                      topRight: const Radius.circular(15),
+                                      bottomLeft: isSender
+                                          ? const Radius.circular(15)
+                                          : const Radius.circular(0),
+                                      bottomRight: isSender
+                                          ? const Radius.circular(0)
+                                          : const Radius.circular(15),
+                                    ),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        message['text'],
+                                        style: TextStyle(
+                                          color: isSender
+                                              ? Colors.white
+                                              : Colors.black87,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 5),
+                                      if (isSender) // Afficher les coches uniquement pour les messages envoyés
+                                        Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.end,
+                                          children: [
+                                            // Vérifier si le message a été envoyé mais pas reçu
+                                            if (!message[
+                                                'delivered']) // Message envoyé mais non reçu
+                                              Icon(
+                                                Icons.check,
+                                                size: 16,
+                                                color: Colors
+                                                    .grey, // Une coche grise pour non reçu
+                                              ),
+                                            // Vérifier si le message a été reçu mais non lu
+                                            if (message['delivered'] &&
+                                                !message[
+                                                    'isRead']) // Message reçu mais non lu
+                                              ...[
+                                              Icon(
+                                                Icons.check,
+                                                size: 16,
+                                                color: Colors
+                                                    .grey, // Première coche grise
+                                              ),
+                                              const SizedBox(
+                                                  width: 2), // Espacement
+                                              Icon(
+                                                Icons.check,
+                                                size: 16,
+                                                color: Colors
+                                                    .grey, // Deuxième coche grise
+                                              ),
+                                            ],
+                                            // Vérifier si le message a été lu
+                                            if (message[
+                                                'isRead']) // Message reçu et lu
+                                              ...[
+                                              Icon(
+                                                Icons.check,
+                                                size: 16,
+                                                color: Colors
+                                                    .blue, // Première coche bleue
+                                              ),
+                                              const SizedBox(
+                                                  width: 2), // Espacement
+                                              Icon(
+                                                Icons.check,
+                                                size: 16,
+                                                color: Colors
+                                                    .blue, // Deuxième coche bleue
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                    ],
                                   ),
                                 ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      message['text'],
-                                      style: TextStyle(
-                                        color: isSender
-                                            ? Colors.white
-                                            : Colors.black87,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 5),
-                                    if (isSender) // Afficher les coches uniquement pour les messages envoyés
-                                      Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.end,
-                                        children: [
-                                          // Vérifier si le message a été envoyé mais pas reçu
-                                          if (!message[
-                                              'delivered']) // Message envoyé mais non reçu
-                                            Icon(
-                                              Icons.check,
-                                              size: 16,
-                                              color: Colors
-                                                  .grey, // Une coche grise pour non reçu
-                                            ),
-                                          // Vérifier si le message a été reçu mais non lu
-                                          if (message['delivered'] &&
-                                              !message[
-                                                  'isRead']) // Message reçu mais non lu
-                                            ...[
-                                            Icon(
-                                              Icons.check,
-                                              size: 16,
-                                              color: Colors
-                                                  .grey, // Première coche grise
-                                            ),
-                                            const SizedBox(
-                                                width: 2), // Espacement
-                                            Icon(
-                                              Icons.check,
-                                              size: 16,
-                                              color: Colors
-                                                  .grey, // Deuxième coche grise
-                                            ),
-                                          ],
-                                          // Vérifier si le message a été lu
-                                          if (message[
-                                              'isRead']) // Message reçu et lu
-                                            ...[
-                                            Icon(
-                                              Icons.check,
-                                              size: 16,
-                                              color: Colors
-                                                  .blue, // Première coche bleue
-                                            ),
-                                            const SizedBox(
-                                                width: 2), // Espacement
-                                            Icon(
-                                              Icons.check,
-                                              size: 16,
-                                              color: Colors
-                                                  .blue, // Deuxième coche bleue
-                                            ),
-                                          ],
-                                        ],
-                                      ),
-                                  ],
-                                ),
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     );
                   },
