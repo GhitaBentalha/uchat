@@ -406,13 +406,13 @@ class _HomePageState extends State<HomePage> {
                 }
               },
             ),
-            ListTile(
+            /*  ListTile(
               leading: Icon(Icons.settings),
               title: Text('Settings'),
               onTap: () {
                 // Navigate to settings
               },
-            ),
+            ),*/
             ListTile(
               leading: Icon(Icons.dark_mode),
               title: Text('Change Theme'),
