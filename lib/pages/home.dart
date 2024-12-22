@@ -12,29 +12,64 @@ import 'package:intl/intl.dart';
 
 class UserAvatar extends StatelessWidget {
   final String userName;
+  final String userId;
 
-  const UserAvatar({Key? key, required this.userName}) : super(key: key);
+  UserAvatar({Key? key, required this.userName, required this.userId})
+      : super(key: key);
 
   @override
   Widget build(BuildContext context) {
+    // Get the first letter of the user's name
     String firstLetter = userName.isNotEmpty ? userName[0].toUpperCase() : '?';
 
-    return Container(
-      width: 40.0,
-      height: 40.0,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: Colors.purple,
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        firstLetter,
-        style: TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.bold,
-          fontSize: 20.0,
-        ),
-      ),
+    return FutureBuilder<DocumentSnapshot>(
+      future: FirebaseFirestore.instance.collection('users').doc(userId).get(),
+      builder: (context, snapshot) {
+        // Show loading indicator while fetching data
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return CircularProgressIndicator(); // Customize loading indicator if needed
+        }
+
+        // Handle error case
+        if (snapshot.hasError) {
+          return Container(); // Handle error case appropriately
+        }
+
+        // Handle case where document doesn't exist
+        if (!snapshot.hasData || !snapshot.data!.exists) {
+          return Container(); // Optionally handle case when user document doesn't exist
+        }
+
+        // Get the profile image from the document
+        String? profileImage = snapshot.data!['profileImage'];
+
+        return Container(
+          width: 40.0,
+          height: 40.0,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: Colors.purple, // Background color when showing initials
+          ),
+          alignment: Alignment.center,
+          child: profileImage != null && profileImage.isNotEmpty
+              ? ClipOval(
+                  child: Image.network(
+                    profileImage,
+                    fit: BoxFit.cover,
+                    width: 40.0,
+                    height: 40.0,
+                  ),
+                )
+              : Text(
+                  firstLetter, // Show the first letter if no image
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 20.0,
+                  ),
+                ),
+        );
+      },
     );
   }
 }
@@ -93,9 +128,9 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _startTimer() {
-    _timer = Timer.periodic(Duration(seconds: 1), (Timer timer) {
+    /*  _timer = Timer.periodic(Duration(seconds: 1), (Timer timer) {
       _fetchChatHistory();
-    });
+    });  */
   }
 
   void _fetchChatHistory() async {
@@ -274,7 +309,8 @@ class _HomePageState extends State<HomePage> {
                     itemBuilder: (context, index) {
                       final chat = _filteredChatHistory[index];
                       return ListTile(
-                        leading: UserAvatar(userName: chat['userName']),
+                        leading: UserAvatar(
+                            userName: chat['userName'], userId: chat['userId']),
                         title: Text(
                           chat['userName'],
                           style: TextStyle(
@@ -386,6 +422,8 @@ class _HomePageState extends State<HomePage> {
                   );
                 } else {
                   var userData = snapshot.data!.data() as Map<String, dynamic>;
+                  String? profileImageUrl = userData['profileImage'];
+
                   return UserAccountsDrawerHeader(
                     accountName: Text('Welcome ${userData['name'] ?? 'User'}'),
                     accountEmail: Text(user?.email ?? 'No Email'),
@@ -393,26 +431,27 @@ class _HomePageState extends State<HomePage> {
                         BoxDecoration(color: Color.fromARGB(186, 101, 11, 103)),
                     currentAccountPicture: CircleAvatar(
                       backgroundColor: Colors.white,
-                      child: Text(
-                        userData['name'] != null && userData['name'].isNotEmpty
-                            ? userData['name'][0].toUpperCase()
-                            : '?',
-                        style: TextStyle(
-                            fontSize: 40.0,
-                            color: Color.fromARGB(186, 101, 11, 103)),
-                      ),
+                      backgroundImage:
+                          profileImageUrl != null && profileImageUrl.isNotEmpty
+                              ? NetworkImage(profileImageUrl)
+                              : null, // Si aucune image, affichera une initiale
+                      child: profileImageUrl == null || profileImageUrl.isEmpty
+                          ? Text(
+                              userData['name'] != null &&
+                                      userData['name'].isNotEmpty
+                                  ? userData['name'][0].toUpperCase()
+                                  : '?',
+                              style: TextStyle(
+                                  fontSize: 40.0,
+                                  color: Color.fromARGB(186, 101, 11, 103)),
+                            )
+                          : null, // N'affiche pas d'initiales si une image est présente
                     ),
                   );
                 }
               },
             ),
-            /*  ListTile(
-              leading: Icon(Icons.settings),
-              title: Text('Settings'),
-              onTap: () {
-                // Navigate to settings
-              },
-            ),*/
+            // Les autres éléments du Drawer...
             ListTile(
               leading: Icon(Icons.dark_mode),
               title: Text('Change Theme'),
@@ -420,14 +459,14 @@ class _HomePageState extends State<HomePage> {
                 // Toggle the dark mode state
                 Provider.of<ThemeProvider>(context, listen: false)
                     .toggleTheme();
-                Navigator.of(context).pop(); // Close the drawer
+                Navigator.of(context).pop(); // Fermer le drawer
               },
             ),
             ListTile(
               leading: Icon(Icons.person),
               title: Text('Profile'),
               onTap: () {
-                // Navigate to profile
+                // Naviguer vers le profil
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => ProfilePage()),
@@ -438,7 +477,7 @@ class _HomePageState extends State<HomePage> {
               leading: Icon(Icons.logout),
               title: Text('Logout'),
               onTap: () async {
-                await _updateDeliveredStatusOnLogout(); // Mettez à jour le champ isActive
+                await _updateDeliveredStatusOnLogout(); // Mettre à jour le champ isActive
                 await FirebaseAuth.instance.signOut();
                 Navigator.of(context).pushAndRemoveUntil(
                   MaterialPageRoute(builder: (context) => SignIn()),

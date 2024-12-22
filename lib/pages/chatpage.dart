@@ -2,6 +2,36 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+class Message {
+  final String text;
+  final String senderId;
+  final String receiverId;
+  final bool isRead;
+  final bool delivered;
+  final Timestamp timestamp;
+
+  Message({
+    required this.text,
+    required this.senderId,
+    required this.receiverId,
+    required this.isRead,
+    required this.delivered,
+    required this.timestamp,
+  });
+
+  factory Message.fromFirestore(DocumentSnapshot doc) {
+    Map data = doc.data() as Map<String, dynamic>;
+    return Message(
+      text: data['text'] ?? '',
+      senderId: data['senderId'] ?? '',
+      receiverId: data['receiverId'] ?? '',
+      isRead: data['isRead'] ?? false,
+      delivered: data['delivered'] ?? false,
+      timestamp: data['timestamp'] ?? Timestamp.now(),
+    );
+  }
+}
+
 class ChatPage extends StatefulWidget {
   final String userId; // ID of the user you're chatting with
   final String userName; // Name of the user you're chatting with
@@ -13,6 +43,7 @@ class ChatPage extends StatefulWidget {
 }
 
 class _ChatPageState extends State<ChatPage> {
+  String? profileImage;
   final TextEditingController _controller = TextEditingController();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final String currentUserId = FirebaseAuth.instance.currentUser!.uid;
@@ -40,10 +71,21 @@ class _ChatPageState extends State<ChatPage> {
   void initState() {
     super.initState();
     _markMessagesAsReadOnInit(widget.userId);
-    _setUserActive(true); // Marquez l'utilisateur comme actif
+    _setUserActive(true);
     _setIsSeen(true);
 
-    // Remarque : Vous devez également vous assurer de marquer l'utilisateur comme inactif lorsque vous quittez la discussion.
+    _fetchUserProfileImage(widget.userId); // Fetch the user's profile image
+  }
+
+  void _fetchUserProfileImage(String userId) async {
+    DocumentSnapshot userDoc =
+        await _firestore.collection('users').doc(userId).get();
+    if (userDoc.exists) {
+      setState(() {
+        profileImage =
+            (userDoc.data() as Map<String, dynamic>)['profileImage'] ?? '';
+      });
+    }
   }
 
   @override
@@ -82,6 +124,7 @@ class _ChatPageState extends State<ChatPage> {
         'receiverId': widget.userId,
         'isRead': false, // Par défaut : le message est marqué comme non lu
         'delivered': false, // Par défaut : non livré initialement
+        'timestamp': FieldValue.serverTimestamp(),
       };
 
       // Ajouter le message à Firestore
@@ -162,10 +205,15 @@ class _ChatPageState extends State<ChatPage> {
           children: [
             CircleAvatar(
               backgroundColor: Colors.grey[300],
-              child: Text(
-                widget.userName[0].toUpperCase(),
-                style: const TextStyle(color: Colors.black),
-              ),
+              backgroundImage: profileImage != null && profileImage!.isNotEmpty
+                  ? NetworkImage(profileImage!)
+                  : null, // If no image, show initials
+              child: profileImage == null || profileImage!.isEmpty
+                  ? Text(
+                      widget.userName[0].toUpperCase(),
+                      style: const TextStyle(color: Colors.black),
+                    )
+                  : null, // Don't show initials if there's an image
             ),
             const SizedBox(width: 8),
             Text(widget.userName),
@@ -196,6 +244,42 @@ class _ChatPageState extends State<ChatPage> {
                 }
 
                 final messages = snapshot.data!.docs;
+                Stream<List<Message>> getMessagesStream() {
+                  return FirebaseFirestore.instance
+                      .collection(
+                          'messages') // Remplacez par le nom de votre collection
+                      .orderBy('timestamp', descending: true) // Trie par date
+                      .snapshots()
+                      .map((snapshot) {
+                    return snapshot.docs.map((doc) {
+                      return Message.fromFirestore(doc);
+                    }).toList();
+                  });
+                }
+
+                StreamBuilder<List<Message>>(
+                  stream: getMessagesStream(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return Center(child: CircularProgressIndicator());
+                    }
+                    if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                      return Center(
+                          child: Text('Aucun message pour le moment.'));
+                    }
+                    final messages = snapshot.data!;
+                    return ListView.builder(
+                      itemCount: messages.length,
+                      itemBuilder: (context, index) {
+                        final message = messages[index];
+                        return ListTile(
+                          title: Text(message.text),
+                          subtitle: Text(message.senderId),
+                        );
+                      },
+                    );
+                  },
+                );
 
                 return ListView.builder(
                   reverse: true,
