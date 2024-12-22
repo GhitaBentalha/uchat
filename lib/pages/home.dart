@@ -282,7 +282,7 @@ class _HomePageState extends State<HomePage> {
                                 : Colors.black,
                             fontWeight: chat['newMessagesCount'] > 0
                                 ? FontWeight.bold
-                                : FontWeight.normal,
+                                : FontWeight.bold,
                           ),
                         ),
                         subtitle: Row(
