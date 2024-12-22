@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
+import 'package:uchat/pages/ProfilePage.dart';
 import 'package:uchat/pages/UserSelectionPage.dart';
 import 'package:uchat/pages/signin.dart';
 import 'package:uchat/theme_provider.dart';
@@ -427,6 +428,10 @@ class _HomePageState extends State<HomePage> {
               title: Text('Profile'),
               onTap: () {
                 // Navigate to profile
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => ProfilePage()),
+                );
               },
             ),
             ListTile(
