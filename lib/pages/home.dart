@@ -315,8 +315,8 @@ class _HomePageState extends State<HomePage> {
                           chat['userName'],
                           style: TextStyle(
                             color: chat['newMessagesCount'] > 0
-                                ? Color.fromARGB(255, 19, 162, 36)
-                                : Colors.black,
+                                ? Color.fromARGB(255, 0, 177, 6)
+                                : null,
                             fontWeight: chat['newMessagesCount'] > 0
                                 ? FontWeight.bold
                                 : FontWeight.bold,
@@ -330,7 +330,7 @@ class _HomePageState extends State<HomePage> {
                                 style: TextStyle(
                                   color: chat['newMessagesCount'] > 0
                                       ? Color.fromARGB(255, 123, 188, 131)
-                                      : Colors.black,
+                                      : null,
                                   fontWeight: chat['newMessagesCount'] > 0
                                       ? FontWeight.bold
                                       : FontWeight.normal,
